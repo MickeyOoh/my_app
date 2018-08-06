@@ -8,6 +8,9 @@ import Data.Question exposing (Question)
 import View.Question
 import Util exposing (onChange)
 
+type alias Flags =
+    Int
+
 
 type alias Model = 
    {  amount : Int
@@ -16,24 +19,13 @@ type alias Model =
    }
 
 
-init : Model
-init = 
-    Model
-     5
-     Data.Difficulty.default
-     (Array.fromList
-        [ Question
-            Nothing
-            "A caterpiller has more muscles than human do."
-            "True"
-            [ "False" ]
-        , Question
-            Nothing
-            "A caterpiller has more muscles than human do."
-            "True"
-            [ "False" ]
-        ]
-
+init : Flags -> (Model, Cmd Msg)
+init flags = 
+    ( Model
+        flags
+        Data.Difficulty.default
+        Array.empty
+    , Cmd.none
     )
      
 view : Model -> Html Msg
@@ -63,11 +55,11 @@ type Msg
     | ChangeDifficulty Difficulty
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Answer i val ->
-            model.questions
+            ( model.questions
                 |> Array.get i
                 |> Maybe.map (\q -> { q | userAnswer = Just val })
                 |> Maybe.map
@@ -75,29 +67,38 @@ update msg model =
                 |> Maybe.map
                     (\arr -> {model | questions = arr})
                 |> Maybe.withDefault model
-
+            , Cmd.none
+            )
 
         UpdateAmount str ->
             case String.toInt str of
                 Ok val ->
                     if val > 50 then
-                        { model | amount = 50 }
+                        ( { model | amount = 50 }
+                        , Cmd.none
+                        )
                     else
-                        { model | amount = val }
+                        ( { model | amount = val }
+                        , Cmd.none
+                        )
 
                 Err err ->
-                    model
+                    ( model
+                    , Cmd.none
+                    )
 
         ChangeDifficulty lvl ->
-            { model | difficulty = lvl }
+            ( { model | difficulty = lvl }
+            , Cmd.none
+            )
 
 
-
-main : Program Never Model Msg
+main : Program Flags Model Msg
 main = 
-    Html.beginnerProgram
-        { model = init
-        , view = view
+    Html.programWithFlags
+        { init = init
         , update = update
+        , view = view
+        , subscriptions = always Sub.none
         }
 
