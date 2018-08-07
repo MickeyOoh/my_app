@@ -1,12 +1,25 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, input, select, option, div)
+import Html 
+    exposing 
+        (Html
+        , text
+        , input
+        , select
+        , option
+        , div
+        )
 import Html.Attributes exposing (value)
 import Array exposing (Array)
 import Data.Difficulty exposing (Difficulty)
 import Data.Question exposing (Question)
 import View.Question
-import Util exposing (onChange)
+import Util exposing (onChange, (=>), appendIf)
+import Request.TriviaQuestions
+import Request.Helpers exposing (queryString)
+import View.Button
+import Json.Decode exposing (Value)
+import Http exposing (Error)
 
 type alias Flags =
     Int
@@ -38,9 +51,15 @@ view { amount, questions } =
             ]
             []
         , select [ onChange (ChangeDifficulty << Data.Difficulty.get)]
-            (List.map (\key -> option [] [ text key ])
+            (List.map
+                (\key ->
+                     option
+                        []
+                        [ text key ]
+                )
                 Data.Difficulty.keys
             )
+        , View.Button.btn Start "Start"
         , div
             []
             (questions
@@ -53,6 +72,9 @@ type Msg
     = Answer Int String 
     | UpdateAmount String
     | ChangeDifficulty Difficulty
+    | Start
+    | GetQuestions (Result Error Value)
+
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -91,6 +113,29 @@ update msg model =
             ( { model | difficulty = lvl }
             , Cmd.none
             )
+        Start ->
+            let
+                diffcultyValue =
+                    model.difficulty
+                        |> Data.Difficulty.toString
+                        |> String.toLower
+                flag =
+                    Data.Difficulty.isAny model.difficulty
+            in
+                ( model
+                , Http.send GetQuestions <|
+                    Http.get
+                        (Request.TriviaQuestions.apiUrl
+                            ([ "amount" => toString model.amount]
+                                |> appendIf (not flag) 
+                                    ("difficulty" => diffcultyValue)
+                                |> queryString)
+                        )
+                        Json.Decode.value
+                )
+
+        GetQuestions res ->
+            ( model, Cmd.none )
 
 
 main : Program Flags Model Msg
