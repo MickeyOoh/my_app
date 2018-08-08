@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Html
     exposing
@@ -48,40 +48,14 @@ init =
     )
 
 
-view : Model -> Html Msg
-view { amount, questions } =
-    div
-        []
-        [ input
-            [ onChange UpdateAmount
-            , value (toString amount)
-            ]
-            []
-        , select [ onChange (ChangeDifficulty << Data.Difficulty.get) ]
-            (List.map
-                (\key ->
-                    option
-                        []
-                        [ text key ]
-                )
-                Data.Difficulty.keys
-            )
-        , View.Button.btn Start "Start"
-        , div
-            []
-            (questions
-                |> Array.indexedMap (\i q -> View.Question.view (Answer i) q)
-                |> Array.toList
-            )
-        ]
-
-
 type Msg
     = Answer Int String
     | UpdateAmount String
     | ChangeDifficulty Difficulty
     | Start
     | GetQuestions (Result Error TriviaResults)
+    | SubmitAnswers
+    | SavedGameResults (List GameResults)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -154,6 +128,75 @@ update msg model =
             , Cmd.none
             )
 
+        SubmitAnswers ->
+            let
+                length =
+                    Array.length model.questions
+
+                score =
+                    Array.foldl
+                        (\{ userAnswer, correct } acc ->
+                            case userAnswer of
+                                Just v ->
+                                    if v == correct then
+                                        acc + 1
+                                    else
+                                        acc
+
+                                Nothing ->
+                                    acc
+                        )
+                        0
+                        model.questions
+
+                res =
+                    GameResults score length
+            in
+                ( model, output res )
+
+        SavedGameResults res ->
+            ( model, Cmd.none )
+
+
+view : Model -> Html Msg
+view { amount, questions } =
+    div
+        []
+        [ input
+            [ onChange UpdateAmount
+            , value (toString amount)
+            ]
+            []
+        , select [ onChange (ChangeDifficulty << Data.Difficulty.get) ]
+            (List.map
+                (\key ->
+                    option
+                        []
+                        [ text key ]
+                )
+                Data.Difficulty.keys
+            )
+        , View.Button.btn Start "Start"
+        , div
+            []
+            (questions
+                |> Array.indexedMap (\i q -> View.Question.view (Answer i) q)
+                |> Array.toList
+            )
+        , View.Button.btn SubmitAnswers "Submit"
+        ]
+
+
+port output : GameResults -> Cmd msg
+
+
+port incoming : (List GameResults -> msg) -> Sub msg
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    incoming SavedGameResults
+
 
 main : Program Never Model Msg
 main =
@@ -161,5 +204,5 @@ main =
         { init = init
         , update = update
         , view = view
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }
