@@ -1,8 +1,8 @@
 module Main exposing (..)
 
-import Html 
-    exposing 
-        (Html
+import Html
+    exposing
+        ( Html
         , text
         , input
         , select
@@ -15,32 +15,39 @@ import Data.Difficulty exposing (Difficulty)
 import Data.Question exposing (Question)
 import View.Question
 import Util exposing (onChange, (=>), appendIf)
-import Request.TriviaQuestions
+import Request.TriviaQuestions exposing (TriviaResults)
 import Request.Helpers exposing (queryString)
 import View.Button
-import Json.Decode exposing (Value)
+
+
+-- import Json.Decode exposing (Value)
+
 import Http exposing (Error)
 
-type alias Flags =
-    Int
+
+type alias GameResults =
+    { score : Int
+    , total : Int
+    }
 
 
-type alias Model = 
-   {  amount : Int
-    , difficulty : Difficulty 
+type alias Model =
+    { amount : Int
+    , difficulty : Difficulty
     , questions : Array Question
-   }
+    }
 
 
-init : Flags -> (Model, Cmd Msg)
-init flags = 
+init : ( Model, Cmd Msg )
+init =
     ( Model
-        flags
+        5
         Data.Difficulty.default
         Array.empty
     , Cmd.none
     )
-     
+
+
 view : Model -> Html Msg
 view { amount, questions } =
     div
@@ -50,10 +57,10 @@ view { amount, questions } =
             , value (toString amount)
             ]
             []
-        , select [ onChange (ChangeDifficulty << Data.Difficulty.get)]
+        , select [ onChange (ChangeDifficulty << Data.Difficulty.get) ]
             (List.map
                 (\key ->
-                     option
+                    option
                         []
                         [ text key ]
                 )
@@ -68,13 +75,13 @@ view { amount, questions } =
             )
         ]
 
+
 type Msg
-    = Answer Int String 
+    = Answer Int String
     | UpdateAmount String
     | ChangeDifficulty Difficulty
     | Start
-    | GetQuestions (Result Error Value)
-
+    | GetQuestions (Result Error TriviaResults)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,7 +94,7 @@ update msg model =
                 |> Maybe.map
                     (\q -> Array.set i q model.questions)
                 |> Maybe.map
-                    (\arr -> {model | questions = arr})
+                    (\arr -> { model | questions = arr })
                 |> Maybe.withDefault model
             , Cmd.none
             )
@@ -113,12 +120,14 @@ update msg model =
             ( { model | difficulty = lvl }
             , Cmd.none
             )
+
         Start ->
             let
                 diffcultyValue =
                     model.difficulty
                         |> Data.Difficulty.toString
                         |> String.toLower
+
                 flag =
                     Data.Difficulty.isAny model.difficulty
             in
@@ -126,24 +135,31 @@ update msg model =
                 , Http.send GetQuestions <|
                     Http.get
                         (Request.TriviaQuestions.apiUrl
-                            ([ "amount" => toString model.amount]
-                                |> appendIf (not flag) 
+                            ([ "amount" => toString model.amount ]
+                                |> appendIf (not flag)
                                     ("difficulty" => diffcultyValue)
-                                |> queryString)
+                                |> queryString
+                            )
                         )
-                        Json.Decode.value
+                        Request.TriviaQuestions.decoder
                 )
 
         GetQuestions res ->
-            ( model, Cmd.none )
+            ( case res of
+                Ok { questions } ->
+                    { model | questions = Array.fromList questions }
+
+                Err err ->
+                    model
+            , Cmd.none
+            )
 
 
-main : Program Flags Model Msg
-main = 
-    Html.programWithFlags
+main : Program Never Model Msg
+main =
+    Html.program
         { init = init
         , update = update
         , view = view
         , subscriptions = always Sub.none
         }
-
