@@ -18,10 +18,6 @@ import Util exposing (onChange, (=>), appendIf)
 import Request.TriviaQuestions exposing (TriviaResults)
 import Request.Helpers exposing (queryString)
 import View.Button
-
-
--- import Json.Decode exposing (Value)
-
 import Http exposing (Error)
 
 
